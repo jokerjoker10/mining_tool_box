@@ -1,0 +1,157 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model User {
+  id               String        @id @default(cuid())
+  name             String?
+  email            String?       @unique
+  emailVerified    DateTime?
+  account_complete Boolean       @default(false)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  accounts         Account[]
+  sessions         Session[]
+  projects            Project[]
+  projectAccess       ProjectAccess[]
+  alarmTargets     AlarmTarget[]
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Project {
+  id           String        @id @default(cuid())
+  name         String
+  tags         String[]
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId       String
+  public_view  Boolean       @default(false)
+  notes        String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  alarmTargets AlarmTarget[]
+  entries      Entry[]
+  projectAccess   ProjectAccess[]
+  alarms       Alarm[]
+  apiKeys      ApiKey[]
+  errors       Error[]
+}
+
+model Alarm {
+  id        String        @id @default(cuid())
+  projectId    String
+  project      Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  type      String
+  data      Json
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  targets   AlarmTarget[]
+}
+
+model AlarmTarget {
+  id        String   @id @default(cuid())
+  alarmId   String
+  alarm     Alarm    @relation(fields: [alarmId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  data      String
+  projects     Project[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ProjectAccess {
+  id          String     @id @default(cuid())
+  projectId      String
+  userId      String
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project        Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  access      AccessType
+  description String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+enum AccessType {
+  OWNER
+  READ_WRITE
+  READ_ONLY
+}
+
+model Entry {
+  id          String   @id @default(cuid())
+  projectId      String
+  project        Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  data        Json
+  public_view Boolean  @default(false)
+  exclude     Boolean  @default(false)
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  errors      Error[]
+}
+
+model ApiKey {
+  id        String    @id @default(cuid())
+  key       String    @unique
+  active    Boolean   @default(true)
+  projectId    String
+  project      Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  expireAt  DateTime?
+}
+
+model Error {
+  id        String   @id @default(cuid())
+  projectId    String
+  project      Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  entryId   String?
+  entry     Entry?   @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  ignore    Boolean  @default(false)
+  data      Json
+  seen      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

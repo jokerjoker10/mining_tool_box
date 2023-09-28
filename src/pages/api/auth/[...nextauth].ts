@@ -1,11 +1,14 @@
 import clientPromise from "@/lib/db";
-import { MongoDBAdapter } from "@auth/mongodb-adapter";
-import NextAuth, { AuthOptions  } from "next-auth";
-import { Adapter } from 'next-auth/adapters'
+import NextAuth, { NextAuthOptions  } from "next-auth";
 import EmailProvider from "next-auth/providers/email";
+import { PrismaAdapter } from "@auth/prisma-adapter";
+import { PrismaClient } from "@prisma/client";
+import prisma from "@/lib/prisma";
+import { error } from "console";
+import { TURBO_TRACE_DEFAULT_MEMORY_LIMIT } from "next/dist/shared/lib/constants";
 
-const mongoAdapter = MongoDBAdapter(clientPromise);
-export const authOptions:AuthOptions = {
+export const authOptions:NextAuthOptions = {
+    adapter: PrismaAdapter(prisma),
     providers: [
         EmailProvider({
             server: {
@@ -19,7 +22,29 @@ export const authOptions:AuthOptions = {
             from: process.env.EMAIL_FROM
         }),
     ],
-    adapter: mongoAdapter,
+    callbacks: {
+        async signIn({user}){          
+            
+            var user_db = await prisma.user.findUnique({
+                where: {
+                    email: user.email!
+                }
+            });
+
+            if(!user_db){
+                return false;
+            }
+            
+            if(!user_db?.account_complete){
+                return true;
+
+                // TODO: Disabele for Production
+                return '/complete_account';
+            }
+
+            return true;
+        }
+    }
 } 
 
 export default NextAuth(authOptions)
